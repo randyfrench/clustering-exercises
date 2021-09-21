@@ -9,8 +9,8 @@ import env
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
-sql = """
-SELECT prop.*,
+sql_query = """
+       SELECT prop.*,
        pred.logerror,
        pred.transactiondate,
        air.airconditioningdesc,
@@ -20,7 +20,7 @@ SELECT prop.*,
        landuse.propertylandusedesc,
        story.storydesc,
        construct.typeconstructiondesc
-FROM   properties_2017 prop
+       FROM   properties_2017 prop
        INNER JOIN (SELECT parcelid,
                    Max(transactiondate) transactiondate
                    FROM   predictions_2017
@@ -34,20 +34,20 @@ FROM   properties_2017 prop
        LEFT JOIN propertylandusetype landuse USING (propertylandusetypeid)
        LEFT JOIN storytype story USING (storytypeid)
        LEFT JOIN typeconstructiontype construct USING (typeconstructiontypeid)
-WHERE  prop.latitude IS NOT NULL
+       WHERE  prop.latitude IS NOT NULL
        AND prop.longitude IS NOT NULL
 """
 
-def get_db_url(database):
+def get_db_url(db):
     from env import host, user, password
-    url = f'mysql+pymysql://{user}:{password}@{host}/{database}'
+    url = f'mysql+pymysql://{user}:{password}@{host}/{db}'
     return url
 
 
 # acquire zillow data using the query
-def get_zillow(sql):
+def get_zillow():
     url = get_db_url('zillow')
-    zillow_df = pd.read_sql(sql, url, index_col='id')
+    zillow_df = pd.read_sql(sql_query, url, index_col='id')
     return zillow_df
 
 
