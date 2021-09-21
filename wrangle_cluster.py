@@ -1,48 +1,16 @@
-#import libraries
-import warnings
-warnings.filterwarnings("ignore")
-
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 import os
-
-# Connection
-from env import host, user, password
-
-# Acquire Zillow Data
-
-# Create function to get the necessary connection url.
-def get_db_url(database):
-    from env import host, user, password
-    url = f'mysql+pymysql://{user}:{password}@{host}/{database}'
-    return url
-
-#def get_connection(db, user=user, host=host, password=password):
-    '''
-    This function uses my info from my env file to
-    create a connection url to access the Codeup db. It takes in a string 
-    name of a database as an argument
-    '''
-    #return f'mysql+pymysql://{user}:{password}@{host}/{db}'
-    
-def get_zillow(sql):
-    url = get_db_url('zillow')
-    zillow_df = pd.read_sql(sql, url, index_col='id')
-    return zillow_df
+import env
 
 
-#create function to retrieve zillow data
-#def new_zillow_data():
-    '''
-    This function reads the Telco data from the Codeup db
-    and returns a pandas DataFrame with three joined tables and all columns.
-    '''
-    
-    sql = '''
-   
-       SELECT prop.*,
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+
+sql = """
+SELECT prop.*,
        pred.logerror,
        pred.transactiondate,
        air.airconditioningdesc,
@@ -52,13 +20,13 @@ def get_zillow(sql):
        landuse.propertylandusedesc,
        story.storydesc,
        construct.typeconstructiondesc
-       FROM   properties_2017 prop
+FROM   properties_2017 prop
        INNER JOIN (SELECT parcelid,
                    Max(transactiondate) transactiondate
                    FROM   predictions_2017
                    GROUP  BY parcelid) pred
                USING (parcelid)
-       JOIN predictions_2017 as pred USING (parcelid, transactiondate)
+               			JOIN predictions_2017 as pred USING (parcelid, transactiondate)
        LEFT JOIN airconditioningtype air USING (airconditioningtypeid)
        LEFT JOIN architecturalstyletype arch USING (architecturalstyletypeid)
        LEFT JOIN buildingclasstype build USING (buildingclasstypeid)
@@ -66,33 +34,22 @@ def get_zillow(sql):
        LEFT JOIN propertylandusetype landuse USING (propertylandusetypeid)
        LEFT JOIN storytype story USING (storytypeid)
        LEFT JOIN typeconstructiontype construct USING (typeconstructiontypeid)
-       WHERE  prop.latitude IS NOT NULL
+WHERE  prop.latitude IS NOT NULL
        AND prop.longitude IS NOT NULL
-       '''
-    # Read in DataFrame from Codeup db.
-    #df = pd.read_sql(sql, get_connection('zillow'))
-    
-    #return df
+"""
 
-# this is to cache a csv file of the data from the db for a quicker read
-def get_zillow_data():
-    '''
-    checks for existing csv file
-    loads csv file if present
-    if there is no csv file, calls new_zillow_data
-    '''
-    
-    if os.path.isfile('zillow.csv'):
-        
-        df = pd.read_csv('zillow.csv', index_col=0)
-        
-    else:
-        
-        df = new_zillow_data()
-        
-        df.to_csv('zillow.csv')
+def get_db_url(database):
+    from env import host, user, password
+    url = f'mysql+pymysql://{user}:{password}@{host}/{database}'
+    return url
 
-    return df
+
+# acquire zillow data using the query
+def get_zillow(sql):
+    url = get_db_url('zillow')
+    zillow_df = pd.read_sql(sql, url, index_col='id')
+    return zillow_df
+
 
 def handle_missing_values(df, prop_required_column = .5, prop_required_row = .70):
 	#function that will drop rows or columns based on the percent of values that are missing:\
@@ -238,43 +195,38 @@ def nulls_by_row(df):
     .rename(index=str, columns={'customer_id': 'num_rows'}).reset_index()
     return rows_missing
 
-
-def get_data_summary(df):
+def summarize(df):
     '''
-    This function takes in a pandas dataframe and prints out the shape of the dataframe, number of missing values, 
-    columns and their data types, summary statistics of numeric columns in the dataframe, as well as the value counts for categorical variables.
+    summarize will take in a single argument (a pandas dataframe)
+    and output to console various statistics on said dataframe, including:
+    # .head()
+    # .info()
+    # .describe()
+    # value_counts()
+    # observation of nulls in the dataframe
     '''
-    # Print out the "shape" of our dataframe - the rows and columns we have to work with
-    print(f'The zillow dataframe has {df.shape[0]} rows and {df.shape[1]} columns.')
-    print('')
-    print('-------------------')
-
-    # print the number of missing values in our dataframe
-    print(f'There are total of {df.isna().sum().sum()} missing values in the entire dataframe.')
-    print('')
-    print('-------------------')
-
-    # print some information regarding our dataframe
-    df.info()
-    print('')
-    print('-------------------')
-    
-    # print out summary stats for our dataset
-    print('Here are the summary statistics of our dataset')
-    print(df.describe())
-    print('')
-    print('-------------------')
-
-    print('Here are the categories and their relative proportions')
-    # check different categories and proportions of each category for object type cols
-    show_vc = ['county','bathrooms','bedrooms', 'year_built']
+    print('=====================================================\n\n')
+    print('Dataframe head: ')
+    print(df.head(3).to_markdown())
+    print('=====================================================\n\n')
+    print('Dataframe info: ')
+    print(df.info())
+    print('=====================================================\n\n')
+    print('Dataframe Description: ')
+    print(df.describe().to_markdown())
+    num_cols = [col for col in df.columns if df[col].dtype != 'O']
+    cat_cols = [col for col in df.columns if col not in num_cols]
+    print('=====================================================')
+    print('DataFrame value counts: ')
     for col in df.columns:
-        if col in show_vc:
-            print(f'value counts of {col}')
+        if col in cat_cols:
             print(df[col].value_counts())
-            print('')
-            print(f'proportions of {col}')
-            print(df[col].value_counts(normalize=True,dropna=False))
-            print('-------------------')
-
-
+        else:
+            print(df[col].value_counts(bins=10, sort=False))
+    print('=====================================================')
+    print('nulls in dataframe by column: ')
+    print(nulls_by_col(df))
+    print('=====================================================')
+    print('nulls in dataframe by row: ')
+    print(nulls_by_row(df))
+    print('============================================')
