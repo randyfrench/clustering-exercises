@@ -48,6 +48,11 @@ def get_db_url(db):
 def get_zillow():
     url = get_db_url('zillow')
     zillow_df = pd.read_sql(sql_query, url, index_col='id')
+    if os.path.isfile('zillow_cached.csv') == False:
+        df = get_zillow(sql)
+        df.to_csv('zillow_cached.csv',index = False)
+    else:
+        df = pd.read_csv('zillow_cached.csv')
     return zillow_df
 
 
@@ -67,11 +72,6 @@ def remove_columns(df, cols_to_remove):
     return df
 
 def wrangle_zillow():
-    if os.path.isfile('zillow_cached.csv') == False:
-        df = get_zillow(sql)
-        df.to_csv('zillow_cached.csv',index = False)
-    else:
-        df = pd.read_csv('zillow_cached.csv')
 
     # Restrict df to only properties that meet single use criteria
     single_use = [261, 262, 263, 264, 266, 268, 273, 276, 279]
@@ -205,6 +205,9 @@ def summarize(df):
     # value_counts()
     # observation of nulls in the dataframe
     '''
+    print(f'There are total of {df.isna().sum().sum()} missing values in the entire dataframe.')
+    print('')
+    print('-------------------')
     print('=====================================================\n\n')
     print('Dataframe head: ')
     print(df.head(3).to_markdown())
